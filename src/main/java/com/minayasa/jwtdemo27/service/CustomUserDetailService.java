@@ -1,24 +1,91 @@
 package com.minayasa.jwtdemo27.service;
 
-import org.springframework.security.core.userdetails.User;
+import com.minayasa.jwtdemo27.entity.RoleEntity;
+import com.minayasa.jwtdemo27.entity.UserEntity;
+import com.minayasa.jwtdemo27.model.RoleModel;
+import com.minayasa.jwtdemo27.model.UserModel;
+import com.minayasa.jwtdemo27.repository.RoleRepository;
+import com.minayasa.jwtdemo27.repository.UserRepository;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class CustomUserDetailService implements UserDetailsService {
 
-    // this method actually does the validation for user existence
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    @Autowired
+    private UserRepository userRepository;
 
-        if (username.equals("John")) { // here you can make a DB call by repository help and do the validation
-            return new User("John", "secret", new ArrayList<>());
-        } else {
-            throw new UsernameNotFoundException("User does not exists");
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+
+    public UserModel register(UserModel userModel){
+
+        UserEntity userEntity = new UserEntity();
+        BeanUtils.copyProperties(userModel, userEntity);//it does not do a deep copy
+
+        Set<RoleEntity> roleEntities = new HashSet<>();
+        //fetch every role from DB based on role id and than set this role to user entity roles
+        for(RoleModel rm :userModel.getRoles()){
+            Optional<RoleEntity> optRole = roleRepository.findById(rm.getId());
+            if(optRole.isPresent()){
+                roleEntities.add(optRole.get());
+            }
         }
+        userEntity.setRoles(roleEntities);
+        userEntity.setPassword(this.passwordEncoder.encode(userModel.getPassword()));
+        userEntity = userRepository.save(userEntity);
+
+        BeanUtils.copyProperties(userEntity, userModel);
+
+        //convert RoleEntities to RoleModels
+        Set<RoleModel> roleModels = new HashSet<>();
+        RoleModel rm = null;
+        for(RoleEntity re :userEntity.getRoles()){
+            rm = new RoleModel();
+            rm.setRoleName(re.getRoleName());
+            rm.setId(re.getId());
+            roleModels.add(rm);
+        }
+        userModel.setRoles(roleModels);
+        return userModel;
+    }
+
+    //this method actually does the validation for user existence
+    @Override
+    public UserDetails loadUserByUsername(String userName) throws UsernameNotFoundException {
+
+        UserEntity userEntity = userRepository.findByUsername(userName);
+
+        if(userEntity == null){//here you can make a DB call with the help of repository and do the validation
+            throw new UsernameNotFoundException("User does not exist!");
+        }
+
+        UserModel userModel = new UserModel();
+        BeanUtils.copyProperties(userEntity, userModel);
+
+        //convert RoleEntities to RoleModels
+        Set<RoleModel> roleModels = new HashSet<>();
+        RoleModel rm = null;
+        for(RoleEntity re :userEntity.getRoles()){
+            rm = new RoleModel();
+            rm.setRoleName(re.getRoleName());
+            rm.setId(re.getId());
+            roleModels.add(rm);
+        }
+
+        userModel.setRoles(roleModels);
+        return userModel;
     }
 }

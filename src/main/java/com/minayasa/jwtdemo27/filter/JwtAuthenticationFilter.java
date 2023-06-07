@@ -1,5 +1,6 @@
 package com.minayasa.jwtdemo27.filter;
 
+
 import com.minayasa.jwtdemo27.service.CustomUserDetailService;
 import com.minayasa.jwtdemo27.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +17,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-// call this filter one once per request
+//call this filter only once per request
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -26,44 +27,46 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private JwtUtil jwtUtil;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        // get jwt token from header
-        // validate jwt token
-        String bearerToken = request.getHeader("Authorization");
-
+    protected void doFilterInternal(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, FilterChain filterChain) throws ServletException, IOException {
+        //get the jwt token from request header
+        //validate that jwt token
+        String bearerToken = httpServletRequest.getHeader("Authorization");
         String username = null;
         String token = null;
 
-        // check if token exist or has Bearer text
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            // extract jwt token from bearer Token
+        //check if token exist or has Bearer text
+        if(bearerToken != null && bearerToken.startsWith("Bearer ")){
+
+            //extract jwt token from bearerToken
             token = bearerToken.substring(7);
 
-            try {
-                // extract username from token
+            try{
+                //extract username from the token
                 username = jwtUtil.extractUsername(token);
 
-                // get user details for this user
+                //get userdetails for this user
                 UserDetails userDetails = customUserDetailService.loadUserByUsername(username);
 
-                // security checks
-                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    usernamePasswordAuthenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                //security checks
+                if(username!=null && SecurityContextHolder.getContext().getAuthentication() == null){
 
-                    SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
-                } else {
-                    System.out.println("Invalid token!");
+                    UsernamePasswordAuthenticationToken upat = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    upat.setDetails(new WebAuthenticationDetailsSource().buildDetails(httpServletRequest));
+
+                    SecurityContextHolder.getContext().setAuthentication(upat);
+
+                }else {
+                    System.out.println("Invalid Token!!");
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
+
+            }catch (Exception ex){
+                ex.printStackTrace();
             }
-        } else {
-            System.out.println("Invalid bearer token format");
+        }else {
+            System.out.println("Invalid Bearer Token Format!!");
         }
 
-        // if all is well forward the filter request to the request endpoint
-        filterChain.doFilter(request, response);
+        //if all is well forward the filter request to the request endpoint
+        filterChain.doFilter(httpServletRequest, httpServletResponse);
     }
 }
